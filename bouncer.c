@@ -10,7 +10,7 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 
 int main(int argc, char *argv[]) {
 
-pcap_t *handle;			/* Session handle */
+		pcap_t *handle;			/* Session handle */
 		char *dev;			/* The device to sniff on */
 		char errbuf[PCAP_ERRBUF_SIZE];	/* Error string */
 		struct bpf_program fp;		/* The compiled filter */

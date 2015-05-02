@@ -73,16 +73,52 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 		printf("   * Invalid IP header length: %u bytes\n", size_ip);
 		return;
 	}
+
+
+	/* determine protocol */
+	// For ICMP and TCP, we continue the checking. For others protocols, we leave the function.
+
+	u_int protocol;
+	switch(ip->ip_p) {
+		case IPPROTO_TCP:
+			printf("Protocol: TCP\n");
+			protocol = 6;
+			break;
+		case IPPROTO_ICMP:
+			printf("Protocol: ICMP\n");
+			protocol = 1;
+			break;
+		default:
+			printf("Protocol not taken in charge.\n");
+			return;
+	}
+
+	/* Size of the payload of the IP packet */
+	
+	if((ip->ip_len)>size_ip){
+		u_int size_ip_payload = ip_len - size_ip;
+	}
+	else{
+		printf("   * Invalid IP total length: %u bytes\n", (ip->ip_len));
+		return;
+	}
 	// tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
 	// size_tcp = TH_OFF(tcp)*4;
 	// if (size_tcp < 20) {
 	// 	printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
 	// 	return;
 	// }
+
+	
+	
+
 	payload = (u_char *)(p + SIZE_ETHERNET + size_ip + size_tcp);
 
 	printf("a packet received of length: %u", size_ip);
 
+	
+
+	
 	/* Define pointers for packet's attributes */
 	
 	/* Check IP header*/
