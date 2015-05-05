@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
 		char *dev;			/* The device to sniff on */
 		char errbuf[PCAP_ERRBUF_SIZE];	/* Error string */
 		struct bpf_program fp;		/* The compiled filter */
-		char filter_exp[] = "icmp[icmptype] == icmp-echo and icmp[icmptype] == icmp-echoreply";	/* The filter expression */
+		char filter_exp[] = "icmp[icmptype] == icmp-echo and icmp[icmptype] == icmp-echoreply";	/* The filter expression */ // ajouter TCP dans filtre.
 		bpf_u_int32 mask;		/* Our netmask */
 		bpf_u_int32 net;		/* Our IP */
 		struct pcap_pkthdr header;	/* The header that pcap gives us */

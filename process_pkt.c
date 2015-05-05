@@ -74,6 +74,17 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 		return;
 	}
 
+	/* Check IP version */
+	if (IP_V(ip) != 4) {
+		printf("Invalid IP version (not 4).");
+		return;
+	}
+
+	/* Check if TTL is zero */
+	if (ip->ip_ttl == 0) {
+		printf("TTL is zero, packet discard");
+		return;
+	}
 
 	/* determine protocol */
 	// For ICMP and TCP, we continue the checking. For others protocols, we leave the function.
@@ -82,10 +93,12 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	switch(ip->ip_p) {
 		case IPPROTO_TCP:
 			printf("Protocol: TCP\n");
+			// Appel fonction TCP
 			protocol = 6;
 			break;
 		case IPPROTO_ICMP:
 			printf("Protocol: ICMP\n");
+			// Appel fonction ICMP
 			protocol = 1;
 			break;
 		default:
@@ -96,7 +109,7 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	/* Size of the payload of the IP packet */
 	
 	if((ip->ip_len)>size_ip){
-		u_int size_ip_payload = ip_len - size_ip;
+		u_int size_ip_payload = (ip->ip_len) - size_ip;
 	}
 	else{
 		printf("   * Invalid IP total length: %u bytes\n", (ip->ip_len));
@@ -132,3 +145,5 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 
 	/* Send processed packet */
 };
+
+
