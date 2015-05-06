@@ -74,6 +74,12 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 		return;
 	}
 
+	/* Check evil bit */
+	if ( (((ip->ip_off) & IP_RF) >> 15) == 1 ){
+		printf("Evil bit set to 1. Discard packet.");
+		return;
+	}
+
 	/* Check IP version */
 	if (IP_V(ip) != 4) {
 		printf("Invalid IP version (not 4).");
