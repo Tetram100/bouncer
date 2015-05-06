@@ -39,7 +39,7 @@ struct sniff_tcp {
 		tcp_seq th_ack;		/* acknowledgement number */
 		u_char th_offx2;	/* data offset, rsvd */
 	#define TH_OFF(th)	(((th)->th_offx2 & 0xf0) >> 4)
-	u_char th_flags;
+		u_char th_flags;
 	#define TH_FIN 0x01
 	#define TH_SYN 0x02
 	#define TH_RST 0x04
@@ -54,12 +54,21 @@ struct sniff_tcp {
 		u_short th_urp;		/* urgent pointer */
 };
 
+struct sniff_icmp {
+	u_char icmp_type;	/* ICMP type */
+	u_char icmp_code;	/* ICMP code */
+	u_short icmp_sum;	/* ICMP checksum */
+	u_short icmp_identifier;	/* ICMP identifier */
+	u_short icmp_sequence;	/* ICMP sequence number */
+	u_long icmp_payload;	/* ICMP data */
+};
 
 void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	const u_char *p){
 
 	const struct sniff_ethernet *ethernet; /* The ethernet header */
 	const struct sniff_ip *ip; /* The IP header */
+	const struct sniff_icmp *icmp; /* The ICMP header */
 	const struct sniff_tcp *tcp; /* The TCP header */
 	const char *payload; /* Packet payload */
 
@@ -87,33 +96,12 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	}
 
 	/* Check if TTL is zero */
-	if (ip->ip_ttl == 0) {
+	if ((ip->ip_ttl) == 0) {
 		printf("TTL is zero, packet discard");
 		return;
 	}
 
-	/* determine protocol */
-	// For ICMP and TCP, we continue the checking. For others protocols, we leave the function.
-
-	u_int protocol;
-	switch(ip->ip_p) {
-		case IPPROTO_TCP:
-			printf("Protocol: TCP\n");
-			// Appel fonction TCP
-			protocol = 6;
-			break;
-		case IPPROTO_ICMP:
-			printf("Protocol: ICMP\n");
-			// Appel fonction ICMP
-			protocol = 1;
-			break;
-		default:
-			printf("Protocol not taken in charge.\n");
-			return;
-	}
-
 	/* Size of the payload of the IP packet */
-	
 	if((ip->ip_len)>size_ip){
 		u_int size_ip_payload = (ip->ip_len) - size_ip;
 	}
@@ -121,15 +109,34 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 		printf("   * Invalid IP total length: %u bytes\n", (ip->ip_len));
 		return;
 	}
-	// tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-	// size_tcp = TH_OFF(tcp)*4;
-	// if (size_tcp < 20) {
-	// 	printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
-	// 	return;
-	// }
 
-	
-	
+	/* determine protocol */
+	// For ICMP and TCP, we continue the checking. For others protocols, we leave the function.
+	u_int protocol;
+	switch(ip->ip_p) {
+		case IPPROTO_TCP:
+			printf("Protocol: TCP\n");
+			// TODO Appel fonction TCP
+			protocol = 6;
+			tcp = (struct sniff_tcp*)(p + SIZE_ETHERNET + size_ip);
+			size_tcp = TH_OFF(tcp)*4;
+
+			// TODO !!!! The check of the tcp size should be in the function process_tcp.
+			if (size_tcp < 20) {
+				printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
+				return;
+			}
+			break;
+		case IPPROTO_ICMP:
+			printf("Protocol: ICMP\n");
+			// TODO Appel fonction ICMP
+			protocol = 1;
+			icmp = (struct sniff_icmp*) (p + SIZE_ETHERNET + size_ip);
+			break;
+		default:
+			printf("Protocol not taken in charge.\n");
+			return;
+	}	
 
 	payload = (u_char *)(p + SIZE_ETHERNET + size_ip + size_tcp);
 
@@ -152,4 +159,66 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	/* Send processed packet */
 };
 
+void process_icmp(const struct sniff_icmp *icmp, u_short length){
+	/* Check Code (=0) */
+	if ((icmp->icmp_code) != 0){
+		printf("Bad ICMP code. Discard packet.");
+		return;
+	}
+
+	/* Check checksum */
+	/* TODO faire une copie de la partie ICMP. Mettre les bits de checksum à zéro. Calculer le checksum. Comparer */
+	/* OU : ne pascopier, ne pas mettre à zéro, calculer, voir si ça fait zéro. */
+	/*if (checksum(icmp, length) != (uint16_t) 0x0000){
+		printf("Wrong ICMP checksum. Discard packet");
+		return;
+	}*/
+
+	/* Check Type (=0 or 8) */
+	switch (icmp->icmp_type) {
+		case 0:
+			printf("ICMP reply.");
+			// TODO check the reply ID. do the bouncing.
+			break;
+		case 8:
+			printf("ICMP request.");
+			// TODO do the boucning.
+			break;
+		default:
+			printf("Bad ICMP ping type. Discard packet.");
+			return;
+	}
+};
+
+/* Calculate the checksum of an ip prtocol header. */
+// uint16_t checksum(void *vdata, size_t length){
+// 	// Cast the data pointer to one that can be indexed.
+//     char* data=(char*)vdata;
+
+//     // Initialise the accumulator.
+//     uint32_t acc=0xffff;
+
+//     // Handle complete 16-bit blocks.
+//     for (size_t i=0;i+1<length;i+=2) {
+//         uint16_t word;
+//         memcpy(&word,data+i,2);
+//         acc+=ntohs(word);
+//         if (acc>0xffff) {
+//             acc-=0xffff;
+//         }
+//     }
+
+//     // Handle any partial block at the end of the data.
+//     if (length&1) {
+//         uint16_t word=0;
+//         memcpy(&word,data+length-1,1);
+//         acc+=ntohs(word);
+//         if (acc>0xffff) {
+//             acc-=0xffff;
+//         }
+//     }
+
+//     // Return the checksum in network byte order.
+//     return htons(~acc);
+// };
 

@@ -31,5 +31,6 @@
 
 /* Add any other declarations you may need here... */
 
-
+#include <inttypes.h>
+#include <stdint.h>
 
