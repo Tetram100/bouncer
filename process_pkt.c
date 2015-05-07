@@ -79,25 +79,25 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	ip = (struct sniff_ip*)(p + SIZE_ETHERNET);
 	size_ip = IP_HL(ip)*4;
 	if (size_ip < 20) {
-		printf("   * Invalid IP header length: %u bytes\n", size_ip);
+		printf(stderr, "   * Invalid IP header length: %u bytes\n", size_ip);
 		return;
 	}
 
 	/* Check evil bit */
 	if ( (((ip->ip_off) & IP_RF) >> 15) == 1 ){
-		printf("Evil bit set to 1. Discard packet.");
+		printf(stderr, "Evil bit set to 1. Discard packet.");
 		return;
 	}
 
 	/* Check IP version */
 	if (IP_V(ip) != 4) {
-		printf("Invalid IP version (not 4).");
+		printf(stderr, "Invalid IP version (not 4).");
 		return;
 	}
 
 	/* Check if TTL is zero */
 	if ((ip->ip_ttl) == 0) {
-		printf("TTL is zero, packet discard");
+		printf(stderr, "TTL is zero, packet discard");
 		return;
 	}
 
@@ -106,7 +106,7 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 		u_int size_ip_payload = (ip->ip_len) - size_ip;
 	}
 	else{
-		printf("   * Invalid IP total length: %u bytes\n", (ip->ip_len));
+		printf(stderr, "   * Invalid IP total length: %u bytes\n", (ip->ip_len));
 		return;
 	}
 
@@ -115,7 +115,7 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	u_int protocol;
 	switch(ip->ip_p) {
 		case IPPROTO_TCP:
-			printf("Protocol: TCP\n");
+			printf(stderr, "Protocol: TCP\n");
 			// TODO Appel fonction TCP
 			protocol = 6;
 			tcp = (struct sniff_tcp*)(p + SIZE_ETHERNET + size_ip);
@@ -123,24 +123,24 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 
 			// TODO !!!! The check of the tcp size should be in the function process_tcp.
 			if (size_tcp < 20) {
-				printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
+				printf(stderr, "   * Invalid TCP header length: %u bytes\n", size_tcp);
 				return;
 			}
 			break;
 		case IPPROTO_ICMP:
-			printf("Protocol: ICMP\n");
+			printf(stderr, "Protocol: ICMP\n");
 			// TODO Appel fonction ICMP
 			protocol = 1;
 			icmp = (struct sniff_icmp*) (p + SIZE_ETHERNET + size_ip);
 			break;
 		default:
-			printf("Protocol not taken in charge.\n");
+			printf(stderr, "Protocol not taken in charge.\n");
 			return;
 	}	
 
 	payload = (u_char *)(p + SIZE_ETHERNET + size_ip + size_tcp);
 
-	printf("a packet received of length: %u", size_ip);
+	printf(stderr, "a packet received of length: %u", size_ip);
 
 	
 
@@ -162,7 +162,7 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 void process_icmp(const struct sniff_icmp *icmp, u_short length){
 	/* Check Code (=0) */
 	if ((icmp->icmp_code) != 0){
-		printf("Bad ICMP code. Discard packet.");
+		printf(stderr, "Bad ICMP code. Discard packet.");
 		return;
 	}
 
@@ -177,15 +177,15 @@ void process_icmp(const struct sniff_icmp *icmp, u_short length){
 	/* Check Type (=0 or 8) */
 	switch (icmp->icmp_type) {
 		case 0:
-			printf("ICMP reply.");
+			printf(stderr, "ICMP reply.");
 			// TODO check the reply ID. do the bouncing.
 			break;
 		case 8:
-			printf("ICMP request.");
+			printf(stderr, "ICMP request.");
 			// TODO do the boucning.
 			break;
 		default:
-			printf("Bad ICMP ping type. Discard packet.");
+			printf(stderr, "Bad ICMP ping type. Discard packet.");
 			return;
 	}
 };
