@@ -63,6 +63,11 @@ struct sniff_icmp {
 	u_long icmp_payload;	/* ICMP data */
 };
 
+/* Prototypes */
+uint16_t checksum(void* vdata, u_short length);
+int process_icmp(const struct sniff_icmp *icmp, u_short length);
+void process_pkt(u_char *args, const struct pcap_pkthdr *header, const u_char *p);
+
 void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	const u_char *p){
 
@@ -101,9 +106,10 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 		return;
 	}
 
+	u_short size_ip_payload = 0;
 	/* Size of the payload of the IP packet */
 	if((ip->ip_len)>size_ip){
-		u_int size_ip_payload = (ip->ip_len) - size_ip;
+		size_ip_payload = (ip->ip_len) - size_ip;
 	}
 	else{
 		printf("   * Invalid IP total length: %u bytes\n", (ip->ip_len));
@@ -126,99 +132,123 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 				printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
 				return;
 			}
-			break;
+
+			return;
 		case IPPROTO_ICMP:
 			printf("Protocol: ICMP\n");
-			// TODO Appel fonction ICMP
 			protocol = 1;
 			icmp = (struct sniff_icmp*) (p + SIZE_ETHERNET + size_ip);
+			switch (process_icmp(icmp, size_ip_payload)){
+				case 1:
+					printf("Echo request.");
+					// TODO add the couple (icmp_id, sending_address) to the hash.
+					//		change the sending address in the IP packet.
+					//		recalculate the checksum.
+					//		send the packet.
+
+				case 2:
+				default:
+					printf("Packet discarded.\n");
+			}
 			break;
 		default:
 			printf("Protocol not taken in charge.\n");
 			return;
 	}	
 
-	payload = (u_char *)(p + SIZE_ETHERNET + size_ip + size_tcp);
+	// payload = (u_char *)(p + SIZE_ETHERNET + size_ip + size_tcp);
 
-	printf("a packet received of length: %u", size_ip);
+	printf("a packet received of length: %u\n", size_ip);
 
 	
 
 	
 	/* Define pointers for packet's attributes */
 	
-	/* Check IP header*/
+	/* Check IP header */
 
-	/* Check type of packet and process*/
+	/* Check type of packet and process */
 
 	
-	/* Check ICMP header*/
-	/* Check TCP header*/
-	/* Check FTP header*/
+	/* Check ICMP header */
+	/* Check TCP header */
+	/* Check FTP header */
 
 	/* Send processed packet */
 };
 
-void process_icmp(const struct sniff_icmp *icmp, u_short length){
+/* Check the ICMP packet. Return 0 if something is wrong with the packet, 1 if it's a request, 2 if it's a reply */
+int process_icmp(const struct sniff_icmp *icmp, u_short length){
+
 	/* Check Code (=0) */
 	if ((icmp->icmp_code) != 0){
-		printf("Bad ICMP code. Discard packet.");
-		return;
+		printf("Bad ICMP code. Discard packet.\n");
+		return 0;
 	}
 
 	/* Check checksum */
-	/* TODO faire une copie de la partie ICMP. Mettre les bits de checksum à zéro. Calculer le checksum. Comparer */
-	/* OU : ne pascopier, ne pas mettre à zéro, calculer, voir si ça fait zéro. */
-	/*if (checksum(icmp, length) != (uint16_t) 0x0000){
-		printf("Wrong ICMP checksum. Discard packet");
-		return;
-	}*/
+	/* Copy the ICMP packet */
+	struct sniff_icmp *icmp_copy = icmp;
+	/* Empty the checksum field of the copy */
+	(icmp_copy->icmp_sum) = 0x0000;
+	/* Calculate the checksum of the copy */
+	uint16_t check_copy = checksum(icmp_copy, length);
+	/* Compare the calculated checksum with the one of the packet */
+	if ((icmp->icmp_sum) != check_copy){
+		printf("Wrong ICMP checksum. Discard packet.\n");
+		return 0;
+	}
 
 	/* Check Type (=0 or 8) */
 	switch (icmp->icmp_type) {
 		case 0:
-			printf("ICMP reply.");
+			printf("ICMP reply.\n");
 			// TODO check the reply ID. do the bouncing.
-			break;
+			return 2;
 		case 8:
-			printf("ICMP request.");
-			// TODO do the boucning.
-			break;
+			printf("ICMP request.\n");
+			// TODO do the boucing.
+			return 1;
 		default:
-			printf("Bad ICMP ping type. Discard packet.");
-			return;
+			printf("Bad ICMP ping type. Discard packet.\n");
+			return 0;
 	}
+
+	/* Default return */
+	return 0;
 };
 
 /* Calculate the checksum of an ip prtocol header. */
-// uint16_t checksum(void *vdata, size_t length){
-// 	// Cast the data pointer to one that can be indexed.
-//     char* data=(char*)vdata;
+// Attention : peut-être changer les types dans cette fonction.
+uint16_t checksum(void* vdata, u_short length){
+	// Cast the data pointer to one that can be indexed.
+    char* data=(char*)vdata;
 
-//     // Initialise the accumulator.
-//     uint32_t acc=0xffff;
+    // Initialise the accumulator.
+    uint32_t acc=0xffff;
 
-//     // Handle complete 16-bit blocks.
-//     for (size_t i=0;i+1<length;i+=2) {
-//         uint16_t word;
-//         memcpy(&word,data+i,2);
-//         acc+=ntohs(word);
-//         if (acc>0xffff) {
-//             acc-=0xffff;
-//         }
-//     }
+    u_short i;
+    // Handle complete 16-bit blocks.
+    for (i=0;i+1<length;i+=2) {
+        uint16_t word;
+        memcpy(&word,data+i,2);
+        acc+=ntohs(word);
+        if (acc>0xffff) {
+            acc-=0xffff;
+        }
+    }
 
-//     // Handle any partial block at the end of the data.
-//     if (length&1) {
-//         uint16_t word=0;
-//         memcpy(&word,data+length-1,1);
-//         acc+=ntohs(word);
-//         if (acc>0xffff) {
-//             acc-=0xffff;
-//         }
-//     }
+    // Handle any partial block at the end of the data.
+    if (length&1) {
+        uint16_t word=0;
+        memcpy(&word,data+length-1,1);
+        acc+=ntohs(word);
+        if (acc>0xffff) {
+            acc-=0xffff;
+        }
+    }
 
-//     // Return the checksum in network byte order.
-//     return htons(~acc);
-// };
+    // Return the checksum in network byte order.
+    return htons(~acc);
+};
 
