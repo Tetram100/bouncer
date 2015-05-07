@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
 		struct pcap_pkthdr header;	/* The header that pcap gives us */
 		const u_char *packet;		/* The actual packet */
 
-	if (argc != 0) {
+	if (argc > 1) {
 		dev = argv[1];
 	} else {
 		/* Define the device */
@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
 		return(2);
 		}
 	}
-
+	fprintf(stderr, "Interface used %s\n", dev);
 
 		/* Find the properties for the device */
 	if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
