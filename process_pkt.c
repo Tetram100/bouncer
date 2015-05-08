@@ -1,4 +1,5 @@
 #include "bouncer.h"
+#include "dict.h"
 
 #define ETHER_ADDR_LEN	6
 #define SIZE_ETHERNET 14
@@ -142,7 +143,7 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 				case 1:
 					printf("Echo request.");
 					// TODO add the couple (icmp_id, sending_address) to the hash.
-					//		change the sending address in the IP packet.
+					//		change the sending address and receiving address in the IP packet.
 					//		recalculate the checksum.
 					//		send the packet.
 
@@ -188,7 +189,7 @@ int process_icmp(const struct sniff_icmp *icmp, u_short length){
 
 	/* Check checksum */
 	/* Copy the ICMP packet */
-	struct sniff_icmp *icmp_copy = icmp;
+	struct sniff_icmp *icmp_copy = (struct sniff_icmp*) icmp;
 	/* Empty the checksum field of the copy */
 	(icmp_copy->icmp_sum) = 0x0000;
 	/* Calculate the checksum of the copy */
@@ -203,11 +204,9 @@ int process_icmp(const struct sniff_icmp *icmp, u_short length){
 	switch (icmp->icmp_type) {
 		case 0:
 			printf("ICMP reply.\n");
-			// TODO check the reply ID. do the bouncing.
 			return 2;
 		case 8:
 			printf("ICMP request.\n");
-			// TODO do the boucing.
 			return 1;
 		default:
 			printf("Bad ICMP ping type. Discard packet.\n");

@@ -3,10 +3,17 @@
 */
 
 #include "bouncer.h"
-
+#include "dict.h"
 
 void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	const u_char *packet);
+
+struct process_argument{
+	bpf_u_int32 bouncer_address;
+	bpf_u_int32 server_address;
+	// hashmap
+};
+
 
 int main(int argc, char *argv[]) {
 
@@ -54,6 +61,13 @@ int main(int argc, char *argv[]) {
 		return(2);
 	}
 	
-	pcap_loop(handle, -1, process_pkt, NULL);
+	// TODO envoyer les bonnes adresses.
+	struct process_argument argument;
+	argument.bouncer_address = net;
+	argument.server_address = net;
 
+	/* Last argument give a pointer to other arguments that we need : the address of the bouncer, the address of the server, the "hashmap" */
+	pcap_loop(handle, -1, process_pkt, (u_char*) &argument);
+
+	return 0;
 }//End of the bouncer
