@@ -1,5 +1,4 @@
 #include "bouncer.h"
-#include "dict.h"
 
 #define ETHER_ADDR_LEN	6
 #define SIZE_ETHERNET 14
@@ -68,6 +67,12 @@ struct sniff_icmp {
 uint16_t checksum(void* vdata, u_short length);
 int process_icmp(const struct sniff_icmp *icmp, u_short length);
 void process_pkt(u_char *args, const struct pcap_pkthdr *header, const u_char *p);
+int add_dict(DICT* dictionary_temp, u_short key, struct in_addr value);
+int position_dict(DICT* dictionary_temp, u_short key);
+int remove_dict(DICT* dictionary_temp, u_short key);
+int exist_dict(DICT* dictionary_temp, u_short key);
+int fetch_dict(DICT* dictionary_temp, u_short key, struct in_addr* add_fetch);
+
 
 void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	const u_char *p){
@@ -189,13 +194,13 @@ int process_icmp(const struct sniff_icmp *icmp, u_short length){
 
 	/* Check checksum */
 	/* Copy the ICMP packet */
-	struct sniff_icmp *icmp_copy = (struct sniff_icmp*) icmp;
+	struct sniff_icmp icmp_copy = (struct sniff_icmp) *icmp;
 	/* Empty the checksum field of the copy */
-	(icmp_copy->icmp_sum) = 0x0000;
+	icmp_copy.icmp_sum = 0x0000;
 	/* Calculate the checksum of the copy */
-	uint16_t check_copy = checksum(icmp_copy, length);
+	uint16_t check_copy = checksum(&icmp_copy, length);
 	/* Compare the calculated checksum with the one of the packet */
-	if ((icmp->icmp_sum) != check_copy){
+	if ((icmp->icmp_sum) != (u_short) check_copy){
 		printf("Wrong ICMP checksum. Discard packet.\n");
 		return 0;
 	}
@@ -251,3 +256,58 @@ uint16_t checksum(void* vdata, u_short length){
     return htons(~acc);
 };
 
+/* Functions to manipulate the dictionary of (ICMP_id, IP_address) */
+int add_dict(DICT* dictionary_temp, u_short key, struct in_addr value){
+	// What to do if the key already is in the dict?
+	int i=0;
+	while(i<100 && (dictionary_temp->id_array)[i]!=(u_short) 0){
+		i++;
+	}
+
+	if(i<100){
+		(dictionary_temp->id_array)[i] = key;
+		(dictionary_temp->add_array)[i] = value;
+		return 1;
+	}
+
+	return 0;
+};
+
+int exist_dict(DICT* dictionary_temp, u_short key){
+	int i = 0;
+	while(i<100 && (dictionary_temp->id_array)[i] != key){
+		i++;
+	}
+
+	if(i!=100){
+		return 1;
+	}
+
+	return 0;
+};
+
+int position_dict(DICT* dictionary_temp, u_short key){
+	int i = 0;
+	while(i<100 && (dictionary_temp->id_array)[i] != key){
+		i++;
+	}
+	return i;
+};
+
+int remove_dict(DICT* dictionary_temp, u_short key){
+	int j = position_dict(dictionary_temp, key);
+	if(j!=100){
+		(dictionary_temp->id_array)[j] = (u_short) 0;
+		return 1;
+	}
+	return 0;
+};
+
+int fetch_dict(DICT* dictionary_temp, u_short key, struct in_addr* add_fetch){
+	int j = position_dict(dictionary_temp, key);
+	if(j!=100){
+		add_fetch = &(dictionary_temp->add_array)[j];
+		return 1;
+	}
+	return 0;
+};

@@ -1,3 +1,7 @@
+
+#ifndef BOUNCER_H
+#define BOUNCER_H
+
 /* Global definitions for the port bouncer
  * Packet headers and so on
  */
@@ -33,4 +37,12 @@
 
 #include <inttypes.h>
 #include <stdint.h>
+#include "dict.h"
 
+char *listen_ip;
+char *listen_port;
+char *server_ip;
+char *server_port;
+DICT *dictionary;
+
+#endif

@@ -3,17 +3,10 @@
 */
 
 #include "bouncer.h"
-#include "dict.h"
 
 void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	const u_char *packet);
-
-struct process_argument{
-	bpf_u_int32 bouncer_address;
-	bpf_u_int32 server_address;
-	// hashmap
-};
-
+void initialize_dict(DICT* dictionary);
 
 int main(int argc, char *argv[]) {
 
@@ -27,6 +20,9 @@ int main(int argc, char *argv[]) {
 		struct pcap_pkthdr header;	/* The header that pcap gives us */
 		const u_char *packet;		/* The actual packet */
 
+		dictionary = (DICT*) malloc(sizeof(DICT));
+		initialize_dict(dictionary);
+
 	if (argc > 1) {
 		dev = argv[1];
 	} else {
@@ -37,6 +33,18 @@ int main(int argc, char *argv[]) {
 		return(2);
 		}
 	}
+
+	if (argc == 5){
+		listen_ip = argv[2];
+		listen_port = argv[3];
+		server_ip = argv[4];
+		server_port = argv[5];
+	}
+	else{
+		printf("Wrong number of argument given to bouncer.sh.\n");
+		return(2);
+	}
+
 	fprintf(stderr, "Interface used %s\n", dev);
 
 		/* Find the properties for the device */
@@ -60,14 +68,28 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "Couldn't install filter %s: %s\n", filter_exp, pcap_geterr(handle));
 		return(2);
 	}
-	
-	// TODO envoyer les bonnes adresses.
-	struct process_argument argument;
-	argument.bouncer_address = net;
-	argument.server_address = net;
 
-	/* Last argument give a pointer to other arguments that we need : the address of the bouncer, the address of the server, the "hashmap" */
-	pcap_loop(handle, -1, process_pkt, (u_char*) &argument);
+	pcap_loop(handle, -1, process_pkt, NULL);
 
-	return 0;
-}//End of the bouncer
+	free(dictionary);
+	return(0);
+};//End of the bouncer
+
+void initialize_dict(DICT* dictionary_empty){
+	//(dictionary_empty->id_array) = {0};
+	//(dictionary_empty->add_array) = {0};
+	int i;
+
+	struct in_addr init_add;
+	if(inet_aton("0.0.0.0",&init_add)==0){
+		printf("Initialization of dict failed.");
+		return;
+	}
+	for(i=0 ; i<SIZE_ARRAY ; i++){
+
+
+		(dictionary_empty->id_array)[i] = (u_short) 0;
+		(dictionary_empty->add_array)[i] = init_add;
+	}
+
+};
