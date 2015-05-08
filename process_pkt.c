@@ -124,12 +124,12 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 
 	/* determine protocol */
 	// For ICMP and TCP, we continue the checking. For others protocols, we leave the function.
-	u_int protocol;
+	
 	switch(ip->ip_p) {
 		case IPPROTO_TCP:
 			printf("Protocol: TCP\n");
 			// TODO Appel fonction TCP
-			protocol = 6;
+			
 			tcp = (struct sniff_tcp*)(p + SIZE_ETHERNET + size_ip);
 			size_tcp = TH_OFF(tcp)*4;
 
@@ -142,17 +142,37 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 			return;
 		case IPPROTO_ICMP:
 			printf("Protocol: ICMP\n");
-			protocol = 1;
+			
 			icmp = (struct sniff_icmp*) (p + SIZE_ETHERNET + size_ip);
 			switch (process_icmp(icmp, size_ip_payload)){
 				case 1:
 					printf("Echo request.");
-					// TODO add the couple (icmp_id, sending_address) to the hash.
-					//		change the sending address and receiving address in the IP packet.
-					//		recalculate the checksum.
-					//		send the packet.
+					// TODO DONE -add the couple (icmp_id, sending_address) to the hash.
+					//		-change the sending address and receiving address in the IP packet.
+					//		-recalculate the checksum.
+					//		-send the packet.
+					if(add_dict(dictionary, (icmp->icmp_identifier), (ip->ip_src)) != 1){
+						printf("Error while adding an entry in dict.");
+						return;
+					}
+					
 
 				case 2:
+					printf("Echo Reply.");
+					// TODO DONE -check if the id is in dict.
+					//		-change the receiving address in the IP packet.
+					//		-recalculate the checksum.
+					//		DONE -clear the dict entry.
+					//		-send the packet.
+					if(exist_dict(dictionary, (icmp->icmp_identifier)) != 1){
+						printf("Echo Reply with unknow id. Packet discarded.");
+						return;
+					}
+
+					if(remove_dict(dictionary, (icmp->icmp_identifier)) != 1){
+						printf("Error while removing an entry from dict.");
+					}
+
 				default:
 					printf("Packet discarded.\n");
 			}
@@ -166,7 +186,7 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 
 	printf("a packet received of length: %u\n", size_ip);
 
-	
+	return;
 
 	
 	/* Define pointers for packet's attributes */
@@ -187,7 +207,7 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 int process_icmp(const struct sniff_icmp *icmp, u_short length){
 
 	/* Check Code (=0) */
-	if ((icmp->icmp_code) != 0){
+	if ((icmp->icmp_code) != (u_char) 0){
 		printf("Bad ICMP code. Discard packet.\n");
 		return 0;
 	}
