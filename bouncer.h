@@ -38,11 +38,15 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include "dict.h"
+#include <unistd.h>
 
 char *listen_ip;
 char *listen_port;
 char *server_ip;
 char *server_port;
 DICT *dictionary;
+
+struct in_addr addr_server;
+struct in_addr addr_bouncer;
 
 #endif

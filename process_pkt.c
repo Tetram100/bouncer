@@ -1,12 +1,12 @@
 #include "bouncer.h"
 
-#define ETHER_ADDR_LEN	6
+#define ETHER_ADDR_LENGTH	6
 #define SIZE_ETHERNET 14
 
 	/* Ethernet header */
 struct sniff_ethernet {
-		u_char ether_dhost[ETHER_ADDR_LEN]; /* Destination host address */
-		u_char ether_shost[ETHER_ADDR_LEN]; /* Source host address */
+		u_char ether_dhost[ETHER_ADDR_LENGTH]; /* Destination host address */
+		u_char ether_shost[ETHER_ADDR_LENGTH]; /* Source host address */
 		u_short ether_type; /* IP? ARP? RARP? etc */
 };
 
@@ -72,21 +72,22 @@ int position_dict(DICT* dictionary_temp, u_short key);
 int remove_dict(DICT* dictionary_temp, u_short key);
 int exist_dict(DICT* dictionary_temp, u_short key);
 int fetch_dict(DICT* dictionary_temp, u_short key, struct in_addr* add_fetch);
+int send_ICMP(struct in_addr addr_receiver, struct sniff_ip *message, size_t length);
 
 
 void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	const u_char *p){
 
-	const struct sniff_ethernet *ethernet; /* The ethernet header */
-	const struct sniff_ip *ip; /* The IP header */
+	// const struct sniff_ethernet *ethernet; /* The ethernet header */
+	struct sniff_ip *ip; /* The IP header */
 	const struct sniff_icmp *icmp; /* The ICMP header */
 	const struct sniff_tcp *tcp; /* The TCP header */
-	const char *payload; /* Packet payload */
+	// const char *payload; /* Packet payload */
 
 	u_int size_ip;
 	u_int size_tcp;
 
-	ethernet = (struct sniff_ethernet*)(p);
+	// ethernet = (struct sniff_ethernet*)(p);
 	ip = (struct sniff_ip*)(p + SIZE_ETHERNET);
 	size_ip = IP_HL(ip)*4;
 	if (size_ip < 20) {
@@ -96,19 +97,19 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 
 	/* Check evil bit */
 	if ( (((ip->ip_off) & IP_RF) >> 15) == 1 ){
-		printf("Evil bit set to 1. Discard packet.");
+		printf("Evil bit set to 1. Discard packet.\n");
 		return;
 	}
 
 	/* Check IP version */
 	if (IP_V(ip) != 4) {
-		printf("Invalid IP version (not 4).");
+		printf("Invalid IP version (not 4).\n");
 		return;
 	}
 
 	/* Check if TTL is zero */
 	if ((ip->ip_ttl) == 0) {
-		printf("TTL is zero, packet discard");
+		printf("TTL is zero, packet discarded.\n");
 		return;
 	}
 
@@ -144,39 +145,68 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 			printf("Protocol: ICMP\n");
 			
 			icmp = (struct sniff_icmp*) (p + SIZE_ETHERNET + size_ip);
+			size_t size_packet = (size_t) (ip->ip_len);
+
 			switch (process_icmp(icmp, size_ip_payload)){
 				case 1:
-					printf("Echo request.");
+					printf("Echo request.\n");
 					// TODO DONE -add the couple (icmp_id, sending_address) to the hash.
-					//		-change the sending address and receiving address in the IP packet.
-					//		-recalculate the checksum.
+					//		DONE -change the sending address and receiving address in the IP packet, set the IP checksum at 0.
 					//		-send the packet.
+					(ip->ip_src) = addr_bouncer;
+					(ip->ip_dst) = addr_server;
+					(ip->ip_sum) = (u_short) 0;
+
 					if(add_dict(dictionary, (icmp->icmp_identifier), (ip->ip_src)) != 1){
-						printf("Error while adding an entry in dict.");
+						printf("Error while adding an entry in dict.\n");
 						return;
 					}
-					
+
+					if(send_ICMP(addr_server, ip, size_packet) == 0){
+						printf("Error while sending.\n");
+						return;
+					}
+					printf("Packet sent.\n");
 
 				case 2:
-					printf("Echo Reply.");
+					printf("Echo Reply.\n");
 					// TODO DONE -check if the id is in dict.
 					//		-change the receiving address in the IP packet.
-					//		-recalculate the checksum.
+					//		
 					//		DONE -clear the dict entry.
-					//		-send the packet.
+					//		DONE -send the packet.
+
 					if(exist_dict(dictionary, (icmp->icmp_identifier)) != 1){
-						printf("Echo Reply with unknow id. Packet discarded.");
+						printf("Echo Reply with unknow id. Packet discarded.\n");
 						return;
 					}
 
+					struct in_addr receiver_addr;
+
+					if(fetch_dict(dictionary, (icmp->icmp_identifier), &receiver_addr) == 0){
+						printf("Failed to get the address corresponding to an ICMP id.\n");
+						return;
+					}
+
+					(ip->ip_src) = addr_bouncer;
+					(ip->ip_dst) = receiver_addr;
+					(ip->ip_sum) = (u_short) 0;
+
+					if(send_ICMP(receiver_addr, ip, size_packet) == 0){
+						printf("Error while sending.\n");
+						return;
+					}
+					printf("Packet sent.\n");
+
+
 					if(remove_dict(dictionary, (icmp->icmp_identifier)) != 1){
-						printf("Error while removing an entry from dict.");
+						printf("Error while removing an entry from dict.\n");
 					}
 
 				default:
 					printf("Packet discarded.\n");
 			}
-			break;
+			return;
 		default:
 			printf("Protocol not taken in charge.\n");
 			return;
@@ -187,20 +217,6 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	printf("a packet received of length: %u\n", size_ip);
 
 	return;
-
-	
-	/* Define pointers for packet's attributes */
-	
-	/* Check IP header */
-
-	/* Check type of packet and process */
-
-	
-	/* Check ICMP header */
-	/* Check TCP header */
-	/* Check FTP header */
-
-	/* Send processed packet */
 };
 
 /* Check the ICMP packet. Return 0 if something is wrong with the packet, 1 if it's a request, 2 if it's a reply */
@@ -241,6 +257,28 @@ int process_icmp(const struct sniff_icmp *icmp, u_short length){
 	/* Default return */
 	return 0;
 };
+
+int send_ICMP(struct in_addr addr_receiver, struct sniff_ip *message, size_t length){
+	/* Open the raw socket */
+	// TODO IPPROTO_ICMP ou IPPROTO_RAW ?
+	int s = socket (PF_INET, SOCK_RAW, IPPROTO_ICMP);
+	if(s==-1){
+		printf("Error while pening the socket. Stop sending.\n");
+		return 0;
+	}
+
+	struct sockaddr_in s_receiver;
+  	s_receiver.sin_family = AF_INET;
+  	s_receiver.sin_addr = addr_receiver;
+
+  	if(sendto(s, message, length, 0, (struct sockaddr *) &s_receiver, sizeof(s_receiver)) == -1){
+  		printf("Failed to send.\n");
+  		return 0;
+  	}
+
+  	close(s);
+  	return 1;
+}
 
 /* Calculate the checksum of an ip prtocol header. */
 // Attention : peut-être changer les types dans cette fonction.
@@ -326,7 +364,7 @@ int remove_dict(DICT* dictionary_temp, u_short key){
 int fetch_dict(DICT* dictionary_temp, u_short key, struct in_addr* add_fetch){
 	int j = position_dict(dictionary_temp, key);
 	if(j!=100){
-		add_fetch = &(dictionary_temp->add_array)[j];
+		*add_fetch = (dictionary_temp->add_array)[j];
 		return 1;
 	}
 	return 0;

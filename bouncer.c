@@ -4,8 +4,7 @@
 
 #include "bouncer.h"
 
-void process_pkt(u_char *args, const struct pcap_pkthdr *header,
-	const u_char *packet);
+void process_pkt(u_char *args, const struct pcap_pkthdr *header, const u_char *packet);
 void initialize_dict(DICT* dictionary);
 
 int main(int argc, char *argv[]) {
@@ -20,9 +19,11 @@ int main(int argc, char *argv[]) {
 		struct pcap_pkthdr header;	/* The header that pcap gives us */
 		const u_char *packet;		/* The actual packet */
 
+		/* Initiliaze the dictionary */
 		dictionary = (DICT*) malloc(sizeof(DICT));
 		initialize_dict(dictionary);
 
+	/* Get the arguments */
 	if (argc > 1) {
 		dev = argv[1];
 	} else {
@@ -34,11 +35,22 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	if (argc == 5){
+	if (argc == 6){
 		listen_ip = argv[2];
 		listen_port = argv[3];
 		server_ip = argv[4];
 		server_port = argv[5];
+
+		if(inet_aton(argv[4], &addr_server)==0){
+			printf("Error while getting the address server: %s\n", server_ip);
+			return(2);
+		}
+		printf("%s\n", inet_ntoa(addr_server));
+		if(inet_aton(argv[2], &addr_bouncer)==0){
+			printf("Error while getting the bouncer server: %s\n", listen_ip);
+			return(2);
+		}
+		printf("%s\n", inet_ntoa(addr_bouncer));
 	}
 	else{
 		printf("Wrong number of argument given to bouncer.sh.\n");
@@ -81,13 +93,12 @@ void initialize_dict(DICT* dictionary_empty){
 	int i;
 
 	struct in_addr init_add;
-	if(inet_aton("0.0.0.0",&init_add)==0){
+
+	if(inet_aton("0.0.0.0", &init_add)==0){
 		printf("Initialization of dict failed.");
 		return;
 	}
 	for(i=0 ; i<SIZE_ARRAY ; i++){
-
-
 		(dictionary_empty->id_array)[i] = (u_short) 0;
 		(dictionary_empty->add_array)[i] = init_add;
 	}
