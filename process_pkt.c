@@ -65,7 +65,7 @@ struct sniff_icmp {
 
 /* Prototypes */
 // uint16_t checksum(void* vdata, u_short length);
-u_short checksum(void *b, u_short len);
+u_short checksum(void *b, int len);
 int process_icmp(const struct sniff_icmp *icmp, u_short length);
 void process_pkt(u_char *args, const struct pcap_pkthdr *header, const u_char *p);
 int add_dict(DICT* dictionary_temp, u_short key, struct in_addr value);
@@ -234,9 +234,10 @@ int process_icmp(const struct sniff_icmp *icmp, u_short length){
 	struct sniff_icmp icmp_copy = (struct sniff_icmp) *icmp;
 	/* Empty the checksum field of the copy */
 	icmp_copy.icmp_sum = 0x0000;
+
 	/* Calculate the checksum of the copy */
 	printf("Starting checksum.\n");
-	uint16_t check_copy = checksum(&icmp_copy, length);
+	uint16_t check_copy = checksum((unsigned short *) &icmp_copy, sizeof (struct sniff_icmp)*8);
 	printf("Ending checksum.\n");
 
 	/* Compare the calculated checksum with the one of the packet */
@@ -319,7 +320,7 @@ int send_ICMP(struct in_addr addr_receiver, struct sniff_ip *message, size_t len
 // };
 
 /* Checksum ICMP */
-u_short checksum(void *b, u_short len){
+u_short checksum(void *b, int len){
 	u_short *buf = b;
   	u_int sum=0;
   	u_short result;
@@ -327,11 +328,14 @@ u_short checksum(void *b, u_short len){
   	for ( sum = 0; len > 1; len -= 2 ){
     	sum += *buf++;
 	}
+	printf("checksum after for.\n");
   	if ( len == 1 ){
     	sum += *(u_char*)buf;
   	}
+  	printf("checksum after if.\n");
   	sum = (sum >> 16) + (sum & 0xFFFF);
   	sum += (sum >> 16);
+  	printf("checksum before result.\n");
   	result = ~sum;
   	return result;
 };
