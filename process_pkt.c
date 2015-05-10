@@ -81,8 +81,8 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 
 	// const struct sniff_ethernet *ethernet; /* The ethernet header */
 	struct sniff_ip *ip; /* The IP header */
-	const struct sniff_icmp *icmp; /* The ICMP header */
-	const struct sniff_tcp *tcp; /* The TCP header */
+	struct sniff_icmp *icmp; /* The ICMP header */
+	struct sniff_tcp *tcp; /* The TCP header */
 	// const char *payload; /* Packet payload */
 
 	u_int size_ip;
@@ -90,14 +90,17 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 
 	// ethernet = (struct sniff_ethernet*)(p);
 	ip = (struct sniff_ip*)(p + SIZE_ETHERNET);
+
+	/* Size of the IP header in bytes */
 	size_ip = IP_HL(ip)*4;
-	if (size_ip < 20) {
+
+	if (size_ip < 20 || size_ip > 60) {
 		printf("   * Invalid IP header length: %u bytes\n", size_ip);
 		return;
 	}
 
 	/* Check evil bit */
-	if ( (((ip->ip_off) & IP_RF) >> 15) == 1 ){
+	if ( ((ntohs(ip->ip_off) & IP_RF) >> 15) == 1 ){
 		printf("Evil bit set to 1. Discard packet.\n");
 		return;
 	}
@@ -115,12 +118,12 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 	}
 
 	u_short size_ip_payload = 0;
-	/* Size of the payload of the IP packet */
-	if((ip->ip_len)>size_ip){
-		size_ip_payload = (ip->ip_len) - size_ip;
+	/* Size of the payload of the IP packet in bytes */
+	if(ntohs(ip->ip_len)>size_ip){
+		size_ip_payload = ntohs(ip->ip_len) - size_ip;
 	}
 	else{
-		printf("   * Invalid IP total length: %u bytes\n", (ip->ip_len));
+		printf("   * Invalid IP total length: %u bytes\n", ntohs(ip->ip_len));
 		return;
 	}
 
@@ -146,7 +149,7 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 			printf("Protocol: ICMP\n");
 			
 			icmp = (struct sniff_icmp*) (p + SIZE_ETHERNET + size_ip);
-			size_t size_packet = (size_t) (ip->ip_len);
+			size_t size_packet = (size_t) ntohs(ip->ip_len);
 
 			switch (process_icmp(icmp, size_ip_payload)){
 				case 1:
@@ -154,20 +157,21 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 					// TODO DONE -add the couple (icmp_id, sending_address) to the hash.
 					//		DONE -change the sending address and receiving address in the IP packet, set the IP checksum at 0.
 					//		-send the packet.
-					(ip->ip_src) = addr_bouncer;
-					(ip->ip_dst) = addr_server;
-					(ip->ip_sum) = (u_short) 0;
-
 					if(add_dict(dictionary, (icmp->icmp_identifier), (ip->ip_src)) != 1){
 						printf("Error while adding an entry in dict.\n");
 						return;
 					}
+
+					(ip->ip_src) = addr_bouncer;
+					(ip->ip_dst) = addr_server;
+					(ip->ip_sum) = (u_short) 0;
 
 					if(send_ICMP(addr_server, ip, size_packet) == 0){
 						printf("Error while sending.\n");
 						return;
 					}
 					printf("Packet sent.\n");
+					return;
 
 				case 2:
 					printf("Echo Reply.\n");
@@ -203,6 +207,7 @@ void process_pkt(u_char *args, const struct pcap_pkthdr *header,
 					if(remove_dict(dictionary, (icmp->icmp_identifier)) != 1){
 						printf("Error while removing an entry from dict.\n");
 					}
+					return;
 
 				default:
 					printf("Packet discarded.\n");
@@ -237,7 +242,7 @@ int process_icmp(const struct sniff_icmp *icmp, u_short length){
 
 	/* Calculate the checksum of the copy */
 	printf("Starting checksum.\n");
-	uint16_t check_copy = checksum((unsigned short *) &icmp_copy, sizeof (struct sniff_icmp)*8);
+	uint16_t check_copy = checksum((unsigned short *) &icmp_copy, length*8);
 	printf("Ending checksum.\n");
 
 	/* Compare the calculated checksum with the one of the packet */
@@ -266,7 +271,7 @@ int process_icmp(const struct sniff_icmp *icmp, u_short length){
 int send_ICMP(struct in_addr addr_receiver, struct sniff_ip *message, size_t length){
 	/* Open the raw socket */
 	// TODO IPPROTO_ICMP ou IPPROTO_RAW ?
-	int s = socket (PF_INET, SOCK_RAW, IPPROTO_ICMP);
+	int s = socket (AF_INET, SOCK_RAW, IPPROTO_RAW);
 	if(s==-1){
 		printf("Error while pening the socket. Stop sending.\n");
 		return 0;
@@ -276,7 +281,8 @@ int send_ICMP(struct in_addr addr_receiver, struct sniff_ip *message, size_t len
   	s_receiver.sin_family = AF_INET;
   	s_receiver.sin_addr = addr_receiver;
 
-  	if(sendto(s, message, length, 0, (struct sockaddr *) &s_receiver, sizeof(s_receiver)) == -1){
+  	if(sendto(s, message, length, 0, (struct sockaddr *) &s_receiver, 32) == -1){
+  		perror("sendto() failed.");
   		printf("Failed to send.\n");
   		return 0;
   	}

@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
 		char *dev;			/* The device to sniff on */
 		char errbuf[PCAP_ERRBUF_SIZE];	/* Error string */
 		struct bpf_program fp;		/* The compiled filter */
-		char filter_exp[] = "icmp";	/* The filter expression */ //TODO ajouter TCP dans filtre.
+		char filter_exp[] = "dst host 172.16.0.115";	/* The filter expression */ //TODO ajouter TCP dans filtre.
 		bpf_u_int32 mask;		/* Our netmask */
 		bpf_u_int32 net;		/* Our IP */
 		struct pcap_pkthdr header;	/* The header that pcap gives us */
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
 		mask = 0;
 	}
 		/* Open the session in promiscuous mode */
-	handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+	handle = pcap_open_live(dev, BUFSIZ, 1, 1, errbuf);
 	if (handle == NULL) {
 		fprintf(stderr, "Couldn't open device %s: %s\n", dev, errbuf);
 		return(2);
